@@ -40,5 +40,5 @@ def recommend(data: pd.DataFrame, group: str, order: str, item: str, seq: list):
     # default = most frequent
     if tuple(seq) not in rules:
         counts = data[item].value_counts()
-        return ([counts.index[0]], counts.iloc[0])
+        return ([counts.index[0]], int(counts.iloc[0]))
     return rules[tuple(seq)]
