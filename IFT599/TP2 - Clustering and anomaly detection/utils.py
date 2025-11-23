@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
 
 
 # ============================
@@ -79,3 +80,20 @@ def metrics(labels, data, method, runs=10, **kwargs):
         "nmi": (np.mean(nmi), np.std(nmi)),
         "time": (np.mean(timer), np.std(timer))
     }
+
+# ============================
+# Reconstruction des erreurs pour détection d'anomalies
+# ============================
+
+def compute_reconstruction_errors(model, data_loader, device='cpu'):
+    model.eval()
+    errors = []
+
+    with torch.no_grad():
+        for (batch,) in data_loader:
+            batch = batch.to(device)
+            x_hat = model(batch)
+            batch_errors = torch.mean((x_hat - batch) ** 2, dim=1)  # Erreur MSE par échantillon
+            errors.extend(batch_errors.cpu().numpy())
+
+    return errors
