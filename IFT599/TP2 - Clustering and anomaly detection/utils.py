@@ -48,6 +48,8 @@ def plot_pca_2d(X_2d, labels=None, title="Projection PCA 2D"):
 # ==============================================================================
 
 import time
+from memory_profiler import memory_usage
+
 from sklearn.metrics import (
     silhouette_score,
     davies_bouldin_score,
@@ -56,22 +58,35 @@ from sklearn.metrics import (
     normalized_mutual_info_score
 )
 
-def metrics(labels, data, method, runs=10, **kwargs):
+def metrics_clustering(labels, data, method, runs=10, **kwargs):
     sil, db, ch, ari, nmi = [], [], [], [], []
     timer, space = [], []
 
     for seed in range(runs):
-        t = time.perf_counter()
-        model = method(random_state=seed, **kwargs)
-        preds = model.fit_predict(data)
+        def run_clustering():
+            model = method(random_state=seed, **kwargs)
+            return model.fit_predict(data)
+
+        t0 = time.perf_counter()
+
+        trace = memory_usage(
+            (run_clustering, ), 
+            max_usage=True,
+            retval=True,
+            interval=0.01
+        )
+
+        max_mem, preds = trace 
+
+        t = time.perf_counter() - t0
+
+        timer.append(t)
+        space.append(max_mem)
         sil.append(silhouette_score(data, preds))
         db.append(davies_bouldin_score(data, preds))
         ch.append(calinski_harabasz_score(data, preds))
         ari.append(adjusted_rand_score(labels, preds))
         nmi.append(normalized_mutual_info_score(labels, preds))
-        t = time.perf_counter() - t
-        timer.append(t)
-
 
     return {
         "silhouette": (np.mean(sil), np.std(sil)),
@@ -79,8 +94,10 @@ def metrics(labels, data, method, runs=10, **kwargs):
         "calinski_harabasz": (np.mean(ch), np.std(ch)),
         "adjusted_rand": (np.mean(ari), np.std(ari)),
         "nmi": (np.mean(nmi), np.std(nmi)),
-        "time": (np.mean(timer), np.std(timer))
+        "time": (np.mean(timer), np.std(timer)),
+        "space": (np.mean(space), np.std(space))
     }
+
 
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 

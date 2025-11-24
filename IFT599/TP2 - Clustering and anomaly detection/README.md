@@ -44,7 +44,7 @@ Dans le cas du dataset HiSeq, il y a 5 classes: BRCA (sein), KIRC (rein), COAD
 (côlon), LUAD (poumon) et PRAD (prostate)
 
 
-### K-NN
+### K-Means
 
 ### DBSCAN
 
