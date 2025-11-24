@@ -1,3 +1,6 @@
 ecg.npz
+ecg.npy
+ecg_data.pt
+
 hiseq_data.csv
 hiseq_labels.csv
