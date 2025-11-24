@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+import sys
 
 
 # ============================
@@ -81,6 +82,70 @@ def metrics(labels, data, method, runs=10, **kwargs):
         "time": (np.mean(timer), np.std(timer))
     }
 
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+
+def metrics_anomaly(train_function, train_data, val_data, test_data, y_test=None, runs=10, device="cpu"):
+   
+    accuracies, recalls, precisions, f1s, aucs = [], [], [], [], []
+    train_times, mem_usages = [], []
+
+    for seed in range(runs):
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+
+        # Entraîner le modèle
+        model, train_stats = train_function(train_data, device=device)
+        train_time = train_stats["train_time"]
+
+        # Taille mémoire
+        if hasattr(model, "parameters"):
+            mem_usage_mb = model_size_mb(model)
+        else:
+            mem_usage_mb = sys.getsizeof(model) / (1024 * 1024)
+
+        # Détection d'anomalies
+        if hasattr(model, "forward") or hasattr(model, "encode"):
+            # AE : val_data et test_data sont des DataLoaders
+            val_stats = compute_reconstruction_errors(model, val_data, device=device)
+            threshold = np.percentile(val_stats["errors"], 95)
+
+            test_stats = compute_reconstruction_errors(model, test_data, device=device)
+            errors_test = test_stats["errors"]
+
+            if y_test is None:
+                raise ValueError("Pour AE, il faut passer y_test à metrics_anomaly.")
+            y_pred = (errors_test > threshold).astype(int)
+        else:
+            # Isolation Forest : val_data et test_data sont des tuples (X, y)
+            X_val, y_val = val_data
+            X_test, y_test = test_data
+
+            errors_val = -model.decision_function(X_val)
+            threshold = np.percentile(errors_val, 95)
+
+            errors_test = -model.decision_function(X_test)
+            y_pred = (errors_test > threshold).astype(int)
+
+        # Calcul des métriques
+        accuracies.append(accuracy_score(y_test, y_pred))
+        recalls.append(recall_score(y_test, y_pred))
+        precisions.append(precision_score(y_test, y_pred))
+        f1s.append(f1_score(y_test, y_pred))
+        aucs.append(roc_auc_score(y_test, errors_test))
+
+        train_times.append(train_time)
+        mem_usages.append(mem_usage_mb)
+
+    return {
+        "accuracy": (np.mean(accuracies), np.std(accuracies)),
+        "recall": (np.mean(recalls), np.std(recalls)),
+        "precision": (np.mean(precisions), np.std(precisions)),
+        "f1_score": (np.mean(f1s), np.std(f1s)),
+        "roc_auc": (np.mean(aucs), np.std(aucs)),
+        "train_time": (np.mean(train_times), np.std(train_times)),
+        "mem_usage_mb": (np.mean(mem_usages), np.std(mem_usages))
+    }
+
 # ============================
 # Reconstruction des erreurs pour détection d'anomalies
 # ============================
@@ -93,7 +158,41 @@ def compute_reconstruction_errors(model, data_loader, device='cpu'):
         for (batch,) in data_loader:
             batch = batch.to(device)
             x_hat = model(batch)
+
             batch_errors = torch.mean((x_hat - batch) ** 2, dim=1)  # Erreur MSE par échantillon
             errors.extend(batch_errors.cpu().numpy())
 
-    return errors
+    errors = np.array(errors)
+    mean_error = float(errors.mean())
+    std_error = float(errors.std())
+
+    return {
+        "errors": errors,
+        "mean": mean_error,
+        "std": std_error
+    }
+
+# ==================================================
+# Taille mémoire du modèle
+# ==================================================
+
+def model_size_mb(model):
+    return sum(p.numel() for p in model.parameters()) * 4 / (1024 ** 2)  # en mégaoctets (float32 = 4 bytes -> 1 byte = 8 bits)
+
+# ==================================================
+# Affichage des métriques
+# ==================================================
+
+def print_metrics_table(metrics_dict, model_name="Model"):
+    """
+    Affiche les métriques sous forme de tableau lisible.
+    """
+    data = {}
+    for k, v in metrics_dict.items():
+        mean_val, std_val = v
+        data[k] = [round(mean_val, 4), round(std_val, 4)]
+    
+    df = pd.DataFrame(data, index=["Mean", "Std"])
+    print(f"{model_name} metrics:\n")
+    print(df)
+    print("\n")

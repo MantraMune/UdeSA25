@@ -56,7 +56,7 @@ class DeepAE(nn.Module):
 # Denoising Auto-Encoder
 class DenoisingAE(DeepAE):
     def __init__(self, in_features, latent_dim=16, noise_factor=0.05):
-        super().__init__()
+        super().__init__(in_features=in_features, latent_dim=latent_dim)
         self.name = "DenoisingAE"
         self.noise_factor = noise_factor
 
