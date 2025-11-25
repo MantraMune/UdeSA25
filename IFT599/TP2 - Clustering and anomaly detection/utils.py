@@ -27,7 +27,7 @@ def plot_pca_2d(X_2d, labels=None, title="Projection PCA 2D"):
         # Pas de labels = pas de couleurs
         plt.scatter(X_2d[:, 0], X_2d[:, 1], s=10)
     else:
-        # Si labels sont textuels → conversion automatique
+        # Si labels sont textuels alors conversion automatique
         if labels.dtype == "object":
             labels = labels.astype("category").cat.codes
 
@@ -49,7 +49,6 @@ def plot_pca_2d(X_2d, labels=None, title="Projection PCA 2D"):
 
 import time
 from memory_profiler import memory_usage
-import inspect
 
 from sklearn.metrics import (
     silhouette_score,
@@ -63,53 +62,32 @@ def metrics_clustering(labels, data, method, runs=10, **kwargs):
     sil, db, ch, ari, nmi = [], [], [], [], []
     timer, space = [], []
 
-    sig = inspect.signature(method)
-    accepts_random_state = "random_state" in sig.parameters
-
-    # Mesurer la RAM une seule fois
-    def run_once_for_memory():
-        params = kwargs.copy()
-        if accepts_random_state:
-            params["random_state"] = 0
-        model = method(**params)
-        return model.fit_predict(data)
-
-    max_mem = memory_usage((run_once_for_memory,), max_usage=True, interval=0.01)
-
+    params = method().get_params(deep=False)
     for seed in range(runs):
 
         def run_clustering():
-            params = kwargs.copy()
-
-            if accepts_random_state:
-                params["random_state"] = seed
-
-            model = method(**params)
+            if "random_state" in params:
+                model = method(random_state=seed, **kwargs)
+            else :
+                model = method(**kwargs)
             return model.fit_predict(data)
-
+        
+        baseline = memory_usage(max_usage=True)
         t0 = time.perf_counter()
-        preds = run_clustering()
+        max_mem, preds = memory_usage(
+            (run_clustering, ), 
+            max_usage=True,
+            retval=True,
+            interval=0.01
+        )
         t = time.perf_counter() - t0
 
-        unique_labels = np.unique(preds)
-
         timer.append(t)
-        space.append(max_mem)
-        if len(unique_labels) > 1 and len(unique_labels) < len(preds):
-            sil.append(silhouette_score(data, preds))
-        else:
-            sil.append(np.nan)
+        space.append(max_mem-baseline)
 
-        if len(unique_labels) > 1:
-            db.append(davies_bouldin_score(data, preds))
-        else:
-            db.append(np.nan)
-
-        if len(unique_labels) > 1:
-            ch.append(calinski_harabasz_score(data, preds))
-        else:
-            ch.append(np.nan)
-
+        sil.append(silhouette_score(data, preds))
+        db.append(davies_bouldin_score(data, preds))
+        ch.append(calinski_harabasz_score(data, preds))
         ari.append(adjusted_rand_score(labels, preds))
         nmi.append(normalized_mutual_info_score(labels, preds))
 
@@ -232,9 +210,9 @@ def print_metrics_table(metrics_dict, model_name="Model"):
     data = {}
     for k, v in metrics_dict.items():
         mean_val, std_val = v
-        data[k] = [round(mean_val, 4), round(std_val, 4)]
+        data[k] = [f"{round(mean_val, 4)} ± {round(std_val, 4)}"]
     
-    df = pd.DataFrame(data, index=["Mean", "Std"])
+    df = pd.DataFrame(data, index=["Value"])
     print(f"{model_name} metrics:\n")
     print(df)
     print("\n")

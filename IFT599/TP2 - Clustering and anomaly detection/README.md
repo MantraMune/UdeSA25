@@ -43,11 +43,6 @@ valeurs moyennes des métriques avec un écart-type.
 Dans le cas du dataset HiSeq, il y a 5 classes: BRCA (sein), KIRC (rein), COAD 
 (côlon), LUAD (poumon) et PRAD (prostate)
 
-
-### K-Means
-
-### DBSCAN
-
 ### Spectral
 
 On va construire une matrice de similarité par noyau gaussien puis calculer le 

@@ -71,7 +71,7 @@ def clean(df):
 def normalize_data(X):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
-    return X_scaled, scaler
+    return pd.DataFrame(X_scaled, columns=X.columns), scaler
 
 
 # ================================
