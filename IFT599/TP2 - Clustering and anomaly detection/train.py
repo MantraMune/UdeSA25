@@ -21,9 +21,9 @@ y_test = data['y_test']
 # Création des DataLoaders
 def dataloaders():
     # Construction des loaders pour AE
-    train_loader = DataLoader(TensorDataset(X_train), batch_size=32, shuffle=True)
-    val_loader = DataLoader(TensorDataset(X_val), batch_size=32, shuffle=False)
-    test_loader = DataLoader(TensorDataset(X_test), batch_size=32, shuffle=False)
+    train_loader = DataLoader(TensorDataset(X_train), batch_size=64, shuffle=True)
+    val_loader = DataLoader(TensorDataset(X_val), batch_size=64, shuffle=False)
+    test_loader = DataLoader(TensorDataset(X_test), batch_size=64, shuffle=False)
 
     # Pour Isolation Forest, on a besoin des labels séparés
     val_data_IF = (X_val, y_val)
@@ -41,7 +41,7 @@ def dataloaders():
 # Entraîner le modèle Deep Auto-Encoder
 # ============================
 
-def train_deepAE(train_loader, epochs=40, device='cpu'):
+def train_deepAE(train_loader, epochs=50, device='cpu'):
     model = DeepAE(in_features=X_train.shape[1], latent_dim=8)
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
@@ -89,7 +89,7 @@ def train_deepAE(train_loader, epochs=40, device='cpu'):
 # ============================
 # Entraîner le modèle variant Denoising Auto-Encoder
 # ============================
-def train_denoisingAE(train_loader,epochs=40, noise_factor=0.2, device='cpu'):
+def train_denoisingAE(train_loader,epochs=50, noise_factor=0.2, device='cpu'):
     model = DenoisingAE(in_features=X_train.shape[1], latent_dim=16, noise_factor=noise_factor)
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
@@ -144,7 +144,7 @@ def train_isolation_forest(train_loader, device='cpu'):
  
  t0 = time.perf_counter()
 
- model = IsolationForest(n_estimators=200, contamination="auto", random_state=42, n_jobs=-1)
+ model = IsolationForest(n_estimators=100, contamination=0.1, random_state=42, n_jobs=-1)
  model.fit(X_train)
 
  train_time = time.perf_counter() - t0

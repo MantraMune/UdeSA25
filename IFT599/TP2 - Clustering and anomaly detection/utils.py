@@ -49,6 +49,7 @@ def plot_pca_2d(X_2d, labels=None, title="Projection PCA 2D"):
 
 import time
 from memory_profiler import memory_usage
+import inspect
 
 from sklearn.metrics import (
     silhouette_score,
@@ -62,29 +63,53 @@ def metrics_clustering(labels, data, method, runs=10, **kwargs):
     sil, db, ch, ari, nmi = [], [], [], [], []
     timer, space = [], []
 
+    sig = inspect.signature(method)
+    accepts_random_state = "random_state" in sig.parameters
+
+    # Mesurer la RAM une seule fois
+    def run_once_for_memory():
+        params = kwargs.copy()
+        if accepts_random_state:
+            params["random_state"] = 0
+        model = method(**params)
+        return model.fit_predict(data)
+
+    max_mem = memory_usage((run_once_for_memory,), max_usage=True, interval=0.01)
+
     for seed in range(runs):
+
         def run_clustering():
-            model = method(random_state=seed, **kwargs)
+            params = kwargs.copy()
+
+            if accepts_random_state:
+                params["random_state"] = seed
+
+            model = method(**params)
             return model.fit_predict(data)
 
         t0 = time.perf_counter()
-
-        trace = memory_usage(
-            (run_clustering, ), 
-            max_usage=True,
-            retval=True,
-            interval=0.01
-        )
-
-        max_mem, preds = trace 
-
+        preds = run_clustering()
         t = time.perf_counter() - t0
+
+        unique_labels = np.unique(preds)
 
         timer.append(t)
         space.append(max_mem)
-        sil.append(silhouette_score(data, preds))
-        db.append(davies_bouldin_score(data, preds))
-        ch.append(calinski_harabasz_score(data, preds))
+        if len(unique_labels) > 1 and len(unique_labels) < len(preds):
+            sil.append(silhouette_score(data, preds))
+        else:
+            sil.append(np.nan)
+
+        if len(unique_labels) > 1:
+            db.append(davies_bouldin_score(data, preds))
+        else:
+            db.append(np.nan)
+
+        if len(unique_labels) > 1:
+            ch.append(calinski_harabasz_score(data, preds))
+        else:
+            ch.append(np.nan)
+
         ari.append(adjusted_rand_score(labels, preds))
         nmi.append(normalized_mutual_info_score(labels, preds))
 
@@ -124,7 +149,7 @@ def metrics_anomaly(train_function, train_data, val_data, test_data, y_test=None
         if hasattr(model, "forward") or hasattr(model, "encode"):
             # AE : val_data et test_data sont des DataLoaders
             val_stats = compute_reconstruction_errors(model, val_data, device=device)
-            threshold = np.percentile(val_stats["errors"], 95)
+            threshold = np.percentile(val_stats["errors"], 25)
 
             test_stats = compute_reconstruction_errors(model, test_data, device=device)
             errors_test = test_stats["errors"]
@@ -138,7 +163,7 @@ def metrics_anomaly(train_function, train_data, val_data, test_data, y_test=None
             X_test, y_test = test_data
 
             errors_val = -model.decision_function(X_val)
-            threshold = np.percentile(errors_val, 95)
+            threshold = np.percentile(errors_val, 25)
 
             errors_test = -model.decision_function(X_test)
             y_pred = (errors_test > threshold).astype(int)
