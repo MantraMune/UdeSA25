@@ -1,9 +1,8 @@
-#include "arduino_secrets.h"
 
-#include <LiquidCrystal.h>
+#include <LiquidCrystal_I2C.h>
 
 // LCD pins
-LiquidCrystal lcd(12, 11, 5, 4, 3, 2); // Pins nÃ©cessaires pour envoyer l'information Ã  MaxMSP (RS (RegisterSelect), EN (Enable), D4 (Data bit 4), D5, D6, D7)
+LiquidCrystal_I2C lcd(0x27, 16, 2); // Pins nÃ©cessaires pour envoyer l'information Ã  MaxMSP (RS (RegisterSelect), EN (Enable), D4 (Data bit 4), D5, D6, D7)
 
 //Ultrason
 const int trigPin = 7;
@@ -20,7 +19,8 @@ int lightLevel;
 void setup() {
   Serial.begin(115200);
   // LCD
-  lcd.begin(16,2);
+  lcd.init();        
+  lcd.backlight();
   lcd.print("BoÃ®te du vide");
   // Ultrason
   pinMode(trigPin, OUTPUT);
