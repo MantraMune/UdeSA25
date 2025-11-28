@@ -21,7 +21,7 @@ void setup() {
   // LCD
   lcd.init();        
   lcd.backlight();
-  lcd.print("BoÃ®te du vide");
+  lcd.print("Boite du vide");
   // Ultrason
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
