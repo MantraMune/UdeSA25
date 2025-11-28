@@ -51,8 +51,10 @@ void loop() {
   lcd.print("D:");
   lcd.print(distance);
   lcd.print("cm ");
+
   lcd.print("L:");
   lcd.print(lightLevel);
+  lcd.print("   "); // Efface les anciennes valeurs plus longues
 
   delay(100);
 }
