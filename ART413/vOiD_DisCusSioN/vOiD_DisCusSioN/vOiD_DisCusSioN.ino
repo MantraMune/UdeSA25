@@ -21,7 +21,6 @@ void setup() {
   // LCD
   lcd.init();        
   lcd.backlight();
-  lcd.print("Boite du vide");
   // Ultrason
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
@@ -47,7 +46,7 @@ void loop() {
   Serial.println(lightLevel);
 
   // -- Afficher LCD
-  lcd.setCursor(0, 1);
+  lcd.setCursor(0, 0);
   lcd.print("D:");
   lcd.print(distance);
   lcd.print("cm ");
