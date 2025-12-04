@@ -42,7 +42,7 @@ void loop() {
 
   // -- Envoyer Ã  MaxMSP
   Serial.print(distance);
-  Serial.print(",");
+  Serial.print(" ");
   Serial.println(lightLevel);
 
   // -- Afficher LCD
