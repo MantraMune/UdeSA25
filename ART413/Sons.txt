@@ -1,4 +1,0 @@
-0, "bruit1.wav";
-1, "respiration.wav";
-2, "glitch.wav";
-3, "demi_phrase.wav";
