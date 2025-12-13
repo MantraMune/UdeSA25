@@ -101,14 +101,18 @@ class LinearClassifier(object):
          Returns a class label for each sample (a number between 0 and
          self.num_classes-1)
         """
-        class_label = np.zeros(X.shape[0])
-        #######################################################################
-        # TODO: Return the best class label.                                  #
-        #######################################################################
+        # Considérer le biais avant de faire la prédiction
+        if self.bias:
+            X = augment(X)
+        
+        # Définir un tableau pour stocker les classes
+        class_label = np.zeros(X.shape[0], dtype=int)
+        
+        # Calculer le score de chaque classe
+        scores = X @ self.W  
 
-        #######################################################################
-        #                          END OF YOUR CODE                           #
-        #######################################################################
+        class_label= np.argmax(scores, axis=1)
+
         return class_label
 
     def global_accuracy_and_cross_entropy_loss(self, X, y, reg=0.0):
@@ -127,15 +131,36 @@ class LinearClassifier(object):
         - average accuracy as single float
         - average loss as single float
         """
+        N = X.shape[0]
         accu = 0
         loss = 0
-        #######################################################################
-        # TODO: Compute the softmax loss & accuracy for a series of samples . #
-        #######################################################################
 
-        #######################################################################
-        #                          END OF YOUR CODE                           #
-        #######################################################################
+        # Considérer que le biais est absorbé dans la matrice des poids
+        if self.bias:
+            X = augment(X)
+
+        for i in range(N):
+            # Scores pour chaque classe
+            scores = X[i] @ self.W
+            scores -= np.max(scores)  # Pour la stabilité numérique
+
+            # Softmax
+            exp_scores = np.exp(scores)
+            probs = exp_scores / np.sum(exp_scores)
+
+            # Prédiction
+            y_pred = np.argmax(probs)
+
+            # Accuracy
+            if y_pred == y[i]:
+                accu += 1
+
+            # Cross-entropy loss
+            loss += -np.log(probs[y[i]])
+        
+        accu /= N # Pour recentrer l'accuracy entre 0 et 1
+        loss /= N # Idem pour la loss
+        
         return accu, loss
 
     def cross_entropy_loss(self, x, y, reg=0.0):
@@ -160,20 +185,23 @@ class LinearClassifier(object):
         loss = 0.0
         dW = np.zeros_like(self.W)
 
-        #######################################################################
-        # TODO: Compute the softmax loss and its gradient.                    #
-        # Store the loss in loss and the gradient in dW.                      #
-        # 0- Compute the score for all classes and subtract the max from it   #
-        #    for numerical stability.                                         #
-        # 1- Compute softmax => eq.(4.104) or eq.(5.25) Bishop                #
-        # 2- Compute cross-entropy loss => eq.(4.108)                         #
-        # 3- Dont forget the regularization!                                  #
-        # 4- Compute gradient => eq.(4.109)                                   #
-        #######################################################################
+        # Scores pour chaque classe
+        scores = x @ self.W
+        scores -= np.max(scores)  # Pour la stabilité numérique 
 
-        #######################################################################
-        #                          END OF YOUR CODE                           #
-        #######################################################################
+        # Softmax
+        exp_scores = np.exp(scores)
+        probs = exp_scores / np.sum(exp_scores)
+
+        # Perte par entropie croisée
+        loss = -np.log(probs[y])
+        loss += 0.5 * reg * np.sum(self.W * self.W)  # Regularization
+
+        # Gradient
+        ds = probs.copy()
+        ds[y] -= 1  # (p_k - 1_{k=y})  
+        dW = np.outer(x, ds) + reg * self.W  #∂L / ∂W + régularisation
+
         return loss, dW
 
 

@@ -100,22 +100,21 @@ class TwoLayerClassifier(object):
         - A numpy array of shape (N) containing one or many class label
         """
         if len(x.shape) == 1:  # Predict on one sample
-            ################################################################
-            # TODO: return the most probable class label for one sample.   #
-            ################################################################
-            return 0
-            ################################################################
-            #                          END OF YOUR CODE                    #
-            ################################################################
 
+            scores = self.net.forward(x)  # Calcul des scores
+            y_pred = np.argmax(scores)  # Classe prédite
+            return y_pred
+        
         elif len(x.shape) == 2:  # Predict on multiple samples
-            ################################################################
-            # TODO: return the most probable class label for many samples  #
-            ################################################################
-            return np.zeros(x.shape[0])
-            ################################################################
-            #                          END OF YOUR CODE                    #
-            ################################################################
+
+            # Créer un tableau pour stocker les prédictions        
+            y_pred = np.zeros(x.shape[0], dtype=int)
+
+            for i in range(x.shape[0]):
+                scores = self.net.forward(x[i])  # Calcul des scores pour chaque échantillon
+                y_pred[i] = np.argmax(scores)  # Classe prédite pour chaque échantillon
+
+            return y_pred
 
     def global_accuracy_and_cross_entropy_loss(self, x, y, l2_r=-1.0):
         """
@@ -135,15 +134,37 @@ class TwoLayerClassifier(object):
         if l2_r > 0:
             self.net.l2_reg = l2_r
 
+        N = x.shape[0]
         loss = 0
         accu = 0
-        #####################################################################
-        # TODO: Compute the softmax loss & accuracy for a series of samples #
-        #####################################################################
 
-        #####################################################################
-        #                          END OF YOUR CODE                         #
-        #####################################################################
+        for i in range(N):
+            # Forward pass to get scores
+            scores = self.net.forward(x[i])
+
+            # SoftMax
+            scores -= np.max(scores)
+            exp_scores = np.exp(scores)
+            probs = exp_scores / np.sum(exp_scores)
+
+            # Accuracy
+            y_pred = np.argmax(probs)
+            if y_pred == y[i]:
+                accu += 1
+            
+            # Perte par entropie croisée
+            loss += -np.log(probs[y[i]])
+
+        accu /= N # Pour recentrer l'accuracy entre 0 et 1
+        loss /= N # Idem pour la loss
+
+        # Régularisation L2
+        if l2_r > 0:
+            loss += 0.5 * l2_r * (
+                np.sum(self.net.layer1.W**2) +
+                np.sum(self.net.layer2.W**2)
+            )
+        
         return accu, loss
 
     def momentum_update(self, w, dw, lr, mu):
@@ -158,13 +179,8 @@ class TwoLayerClassifier(object):
         """
 
         v_prev = self.momentum_cache_v_prev[id(w)]
-        #####################################################################
-        # TODO: update w with momentum                                      #
-        #####################################################################
-        v = 0  # remove this line
-        #####################################################################
-        #                          END OF YOUR CODE                         #
-        #####################################################################
+        v = mu * v_prev - lr * dw # Calcul de la vitesse
+        w += v  # Mise à jour des poids
         self.momentum_cache_v_prev[id(w)] = v
 
 
@@ -228,22 +244,22 @@ class TwoLayerNet(object):
         - gradient with respect to score; an array of same shape of scores
         """
 
-        loss = 999.9
+        loss = 0
         dloss_dscores = np.zeros(np.size(scores))
 
-        ######################################################################
-        # TODO: Compute the softmax loss and its gradient.                   #
-        # Store the loss in loss and the gradient in dW.                     #
-        # 0- Subtract the max from the scores for numerical stability.       #
-        # 1- Compute softmax => eq.(4.104) or eq.(5.25) Bishop               #
-        # 2- Compute cross-entropy loss => eq.(4.108)                        #
-        # 3- Dont forget the regularization!                                 #
-        # 4- Compute gradient wrt. the score => eq.(4.109) with phi_n=1      #
-        ######################################################################
+        # Calcul des scores
+        scores -= np.max(scores)  # Pour la stabilité numérique
 
-        ######################################################################
-        #                          END OF YOUR CODE                          #
-        ######################################################################
+        # Softmax
+        exp_scores = np.exp(scores)
+        probs = exp_scores / np.sum(exp_scores)
+
+        # Perte par entropie croisée
+        loss = -np.log(probs[y])
+
+        # Gradient de la perte par rapport aux scores
+        dloss_dscores = probs.copy()
+        dloss_dscores[y] -= 1.0  # (p_k - 1_{k=y})
 
         return loss, dloss_dscores
 
@@ -286,18 +302,23 @@ class DenseLayer(object):
         Returns a tuple of:
         - f: a floating point value
         """
-        x = augment(x)
-        #################################################
-        # TODO: Compute forward pass                    #
-        # Do not forget to add 1 to x in case of bias   #
-        # C.f. function augment(x)                      #
-        #################################################
-        f = self.W[1]  # REMOVE THIS LINE
+        # Augmenter x pour le biais
+        x_aug = augment(x)
 
-        #################################################
-        #               END OF YOUR CODE                #
-        #################################################
-        self.last_x = x
+        # Produit linéaire
+        z = x_aug @ self.W
+
+        # Activation
+        if self.activation is None:
+            f = z
+        elif self.activation == 'sigmoid':
+            f = 1 / (1.0 + np.exp(-z))
+        elif self.activation == 'relu':
+            f = np.maximum(0.0, z)
+        else:
+            raise ValueError('Unknown activation "%s"' % self.activation)
+        
+        self.last_x = x_aug
         self.last_activ = f
 
         return f
